@@ -1,6 +1,7 @@
 from siteApp.views import *
 import time
 import subprocess
+import platform
 
 #GoDaddy Base url
 GD_BASE_URL = "https://api.ote-godaddy.com"
@@ -15,14 +16,14 @@ LV_X_Shopper_ID = '206227487'
 
 
 # Modular function
-def unassignDomain(request, custID, domain_id, site_id):
+def unassignDomain(request, custID, domain_id):
 	try:
-		get_user_sites = userSites.objects.get(id=site_id, domain_id=domain_id)
+		get_user_sites = userSites.objects.get(cust_id=custID, domain_id=domain_id)
 		get_user_sites.is_domain_connected = 0
 		get_user_sites.domain_id = 0
 		get_user_sites.save()
 
-		get_general_settings = userGeneralSettings.objects.get(cust_id=custID, user_site_id=site_id)
+		get_general_settings = userGeneralSettings.objects.get(cust_id=custID, user_site_id=get_user_sites.id)
 		get_general_settings.custom_domain = ""
 		get_general_settings.save()
 		return "Domain unassigned"
@@ -65,9 +66,17 @@ def createConfSettings(domainName, HtmlFolderPath):
 		#os.remove(conf_flie_path)
 		#os.chdir("/etc/apache2/sites-available")
 		
-		
-		site_enable_command =  f"sudo a2ensite {main_file_name}.conf"
+		# server_platform = platform.system()
+		# if server_platform == 'Darwin':
+			# site_enable_command = f"sudo a2ensite {main_file_name}.conf"
+			# restart_apache = "sudo launchctl reload apache2"
+
+		# elif server_platform == 'Linux':
+		site_enable_command = f"sudo a2ensite {main_file_name}.conf"
 		restart_apache = "sudo systemctl reload apache2"
+		
+		# site_enable_command =  f"sudo a2ensite {main_file_name}.conf"
+		# restart_apache = "sudo systemctl reload apache2"
 		
 		#os.system("sudo a2ensite "+str(domainName)+".conf")
 		
@@ -93,6 +102,7 @@ class UserDomains(APIView):
 			get_user_sites = userSites.objects.filter(cust_id=custID, is_active=1)
 			for domain in get_domains:
 				domain_dict = {}
+				domain_dict['id'] = domain.id
 				domain_dict['domain_name'] = domain.domain_name
 				domain_dict['domain_id'] = domain.domain_id
 				domain_dict['start_date'] = domain.start_date
@@ -102,7 +112,7 @@ class UserDomains(APIView):
 				domain_dict['server_ip'] = domain.server_ip
 				domain_dict['assign_to_site'] = "No"
 				for sites in get_user_sites:
-					if domain.domain_id == sites.domain_id:
+					if domain.id == sites.domain_id:
 						domain_dict['assign_to_site'] = {"site_id":sites.id, "assigned_site_name":sites.site_name}
 					else:
 						pass
@@ -414,19 +424,26 @@ class AssignDomainToSite(APIView):
 		try:
 			custID = request.user.id
 			domain_id = int(request.POST['domain_id'])
-			#domain_name = request.POST['domain_name']
-			domain_name = "projectmindfulness.us"
 			site_id = int(request.POST['site_id'])
+
+			# Check if user have that domain
 			try:
-				existing_site_id = int(request.POST['existing_site_id'])
-			except Exception:
-				existing_site_id = 0
+				userDomainDetail = userDomain.objects.get(cust_id=custID, id=domain_id)
+			except userDomain.DoesNotExist:
+				response  = {}				
+				response['status'] = status.HTTP_404_NOT_FOUND	
+				response['message'] = 'Domain not available! ' + str(err)	
+				return Response(response)
 
+
+			#domain_name = request.POST['domain_name']
+			domain_name = userDomainDetail.domain_name
+		
 			# un-assign domain if want to assign to different site
-			if existing_site_id > 0:
-				unassign_domain = unassignDomain(request, custID, domain_id, existing_site_id)
-
-			get_user_sites = userSites.objects.get(id=site_id)
+			# Check domain ID uniqueness
+			unassignDomain(request, custID, domain_id)
+			
+			get_user_sites = userSites.objects.get(cust_id=custID, id=site_id)
 			get_user_sites.is_domain_connected = 1
 			get_user_sites.domain_id = domain_id
 			get_user_sites.save()
@@ -527,7 +544,7 @@ class UnAssignDomainFromSite(APIView):
 			domain_id = int(request.POST['domain_id'])
 			site_id = int(request.POST['site_id'])
 
-			unassign_domain = unassignDomain(request, custID, domain_id, site_id)
+			unassign_domain = unassignDomain(request, custID, domain_id)
 
 			if unassign_domain == "Domain unassigned":
 				final_response['description'] = unassign_domain
