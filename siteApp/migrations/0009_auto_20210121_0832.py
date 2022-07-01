@@ -331,7 +331,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='usersitesplan',
             name='cust_id',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings._MODEL),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='usersitesplan',
