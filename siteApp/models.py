@@ -11,7 +11,7 @@ import time
 
 class User(AbstractUser):
 	phone = models.CharField(default='null',max_length=250)
-	display_name = models.CharField(default='null',max_length=250)
+	# display_name = models.CharField(default='null',max_length=250)
 	forgot_pswd_status = models.IntegerField(default=0, blank=True)
 	profile_picture = models.ImageField(upload_to='profile_pics', default="default-profile.png")
 	bio = models.CharField(max_length=500, default="null")
@@ -19,6 +19,10 @@ class User(AbstractUser):
 
 	class Meta:
 		db_table = 'auth_user'
+	
+	@property
+	def display_name(self):
+		return '%s %s' % (self.first_name, self.last_name)
 
 
 # class custMaster(models.Model):
