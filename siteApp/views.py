@@ -6,7 +6,8 @@ from rest_framework.response import Response
 from rest_framework import authentication, permissions, status
 from oauth2_provider.contrib.rest_framework import TokenHasReadWriteScope, TokenHasScope
 from django.shortcuts import render, HttpResponse, HttpResponseRedirect, resolve_url, redirect
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.conf import settings
 from siteApp.serializers import UserSerializer, GroupSerializer
@@ -45,27 +46,33 @@ import stripe
 import sendgrid
 from sendgrid.helpers.mail import Email, Substitution, Mail, Personalization 
 
+User = get_user_model()
+
 
 
 #stripe.api_key = "sk_test_D97FSURZATTPQI40AYvGFHpU"
-stripe.api_key = "sk_test_51DvBo8HwYPRN8kzUY9fLn5fXMpdRRgfKyO45YPrJnLEQRaK6lEHZpm9Jq17P44wPg95yFfEpSTivkscI4qD8NMTy00vNnTzJHn"
+# stripe.api_key = "sk_test_51DvBo8HwYPRN8kzUY9fLn5fXMpdRRgfKyO45YPrJnLEQRaK6lEHZpm9Jq17P44wPg95yFfEpSTivkscI4qD8NMTy00vNnTzJHn"
+stripe.api_key = settings.STRIPE_API_KEY
 #Stripe_Pub_key = "pk_test_zJ7GSTlq3evk1L21dmhpfAcq"
 
 AccessToken = get_access_token_model()
 RefreshToken = get_refresh_token_model()
 Application = get_application_model()
 
-#google client
-api_client_id = 'x4ahpCqVHTL71MXOTFWdrcynBGZiwgIACCOxeu6e'
-api_client_secret = 'coh8MlDo6onTzhYqs4V5RGuTnXToojckDiThDPbk5kxUKSrF4U2qACIu4paXLjfrQUHcCAxURV1nQWk9yS0VqLXVqZCSNBQt6w8eI5MQ9abjSp64fPgVqGhPtdUrJOqm'
+api_client_id = settings.API_CLIENT_ID
+api_client_secret = settings.API_CLIENT_SECRET
 
 #Zoho Details
 #ZOHO_CLIENT_ID = "1000.DL8VZCO7DRECZP9DPH96QEGRN108YU"
 #ZOHO_CLIENT_SECRET = "3f39da7a0f41dd80cc29f148c3db07252aa74cc4db"
-ZOHO_CLIENT_ID = "1000.QVTM7QYG67JKTO6HWLNGZ6HV0KK3IB"
-ZOHO_CLIENT_SECRET = "f832eeb9d709d2ad8bf6f5209da1c6a74cfdde5f49"
-ZOHO_REDIRECT_URI = "http://159.65.145.117/zoho-token" 
-Zoho_Subscriptions_OrgID = "733685323"
+# ZOHO_CLIENT_ID = "1000.QVTM7QYG67JKTO6HWLNGZ6HV0KK3IB"
+ZOHO_CLIENT_ID = "1000.FD5HBFLU9NNOOUOUH9YMWV2OEZMMPX" # Adeel's app
+ZOHO_CLIENT_SECRET = "8de1ffa8b5ad444bc27b927827bf889fbdfbda6893" # Adeel's app
+# ZOHO_CLIENT_SECRET = "f832eeb9d709d2ad8bf6f5209da1c6a74cfdde5f49"
+ZOHO_REDIRECT_URI = "http://localhost:8000/zoho-token" 
+# ZOHO_REDIRECT_URI = "http://159.65.145.117/zoho-token" 
+Zoho_Subscriptions_OrgID = "780854566"
+# Zoho_Subscriptions_OrgID = "733685323"
 # Zoho_Desk_OrgID = "743184512"
 Zoho_Desk_OrgID = "733785182"
 Zoho_Refersh_Token_Url = "https://accounts.zoho.com/oauth/v2/token"
@@ -75,16 +82,11 @@ country_phone_codes = {"BD": "880", "BE": "32", "BF": "226", "BG": "359", "BA": 
 
 
 def logError(e):
-	f = open('/var/www/siteSeedApi/errorlog.txt','a')
-	error = str(e)+"\n"
+	# f = open('/var/www/siteSeedApi/errorlog.txt','a')
+	f = open('./errorlog.txt','a')
+	error = "["+str(datetime.datetime.now())+"]" + " " + str(e)+"\n"
 	f.write(error)
 	f.close()
-
-def baseB64Encode(data):
-	return base64.b64encode(bytes(data, 'utf-8')).decode('ascii')
-
-def baseB64Decode(data):
-	return base64.b64decode(bytes(data, 'utf-8')).decode('ascii')
 
 def Handle_404_Error(request):
 	final_response = {}
@@ -92,10 +94,6 @@ def Handle_404_Error(request):
 	final_response['message'] = "Page not found!"
 	
 	return HttpResponse(json.dumps(final_response), content_type='application/json')
-
-def func_phone_format(n):
-    return format(int(n[:-1]), ",").replace(",", "-") + n[-1]
-
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -213,17 +211,7 @@ def emailAuth(request):
 		post_data = json.loads(request.body)
 		email = post_data['email']
 		password = post_data['password']
-		try:	 
-			user_data = custMaster.objects.get(email=email)
-			email = user_data.email
-			custID = user_data.cust_id
-			first_name = user_data.first_name
-			last_name = user_data.last_name
-			phone = user_data.phone
-			display_name = user_data.display_name
-			bio = user_data.bio
-			profile_pic = user_data.profile_picture.url
-			
+		try:	 			
 			url = str(settings.TOKEN_URL)+'/o/token/'
 				
 			cleaned_data = {}
@@ -245,10 +233,14 @@ def emailAuth(request):
 				
 			messageType = "success"
 			message = "success"
+
+			user_data = User.objects.get(email=email)
+
 			final_response['token_information'] = req_data
-			final_response['userinfo'] = {"custID":custID, "phone":phone, "first_name":first_name, 'last_name':last_name, 'email':email, 'display_name':display_name, 'bio':bio, 'profile_picture':profile_pic}
-			final_response['messageType'] = messageType		
-			final_response['message'] = message	
+			final_response['userinfo'] = { "id": user_data.id, "phone": user_data.phone, "first_name": user_data.first_name, 'last_name': user_data.last_name,
+                                 'email': user_data.email, 'display_name': user_data.display_name, 'bio': user_data.bio, 'profile_picture': user_data.profile_picture.url }
+			final_response['messageType'] = messageType
+			final_response['message'] = message
 			final_response['status'] = status.HTTP_200_OK
 
 			return HttpResponse(json.dumps(final_response), content_type='application/json')
@@ -538,45 +530,46 @@ def createUserAccount(request):
 			lastName = str(post_data['last_name'])
 			email = str(post_data['email'])
 			password = str(post_data['password'])
-			security_code = str(post_data['security_code'])
+			# security_code = str(post_data['security_code'])
 
 			#check user if already exists
 			try:
-				user_data = custMaster.objects.get(email=email)
+				user_data = User.objects.get(email=email)
 				email = user_data.email
 				final_response['status'] = status.HTTP_400_BAD_REQUEST	
 				final_response['message'] = "User already exists"
 				return HttpResponse(json.dumps(final_response))
-			except custMaster.DoesNotExist:
+			except User.DoesNotExist:
 				try:
-					try:
-						check_beta = betaTesters.objects.get(email=email, security_code=security_code)	
-					except betaTesters.DoesNotExist:	
-						final_response['status'] = status.HTTP_400_BAD_REQUEST	
-						final_response['message'] = "User cannot register"
-						return HttpResponse(json.dumps(final_response))
+					# try:
+					# 	check_beta = betaTesters.objects.get(email=email, security_code=security_code)	
+					# except betaTesters.DoesNotExist:	
+					# 	final_response['status'] = status.HTTP_400_BAD_REQUEST	
+					# 	final_response['message'] = "User cannot register"
+					# 	return HttpResponse(json.dumps(final_response))
 					
 					# create user object
-					create_user = User.objects.create_user(email, email, password)
-					create_user.first_name = firstName
-					create_user.last_name = lastName
+					create_user = User.objects.create_user(email, email, password, first_name=firstName, last_name=lastName)
+					# create_user.first_name = firstName
+					# create_user.last_name = lastName
 					create_user.save()
 
 					# entry in cust_master table
-					create_user_profile = custMaster(cust_id=create_user.id, first_name=firstName, last_name=lastName, email=email, display_name=firstName)
-					create_user_profile.save()
+					# create_user_profile = custMaster(cust_id=create_user.id, first_name=firstName, last_name=lastName, email=email, display_name=firstName)
+					# create_user_profile.save()
 
 					# Add customer to ZOHO subscription
+					# We don't need zoho subscription any more, intead create stripe customer
 					zoho_msg = ''
-					try:
-						add_zoho_subscription = zohoSubscription(create_user.id, firstName, lastName, email)
-						if "You are not authorized to perform this operation" in add_zoho_subscription:
-							get_new_token = RefreshZohoToken()
-							add_zoho_subscription = zohoSubscription(create_user.id, firstName, lastName, email)
-						else:
-							zoho_msg = add_zoho_subscription
-					except Exception as e:
-						zoho_msg = str(e)
+					# try:
+					# 	add_zoho_subscription = zohoSubscription(create_user.id, firstName, lastName, email)
+					# 	if "You are not authorized to perform this operation" in add_zoho_subscription:
+					# 		get_new_token = RefreshZohoToken()
+					# 		add_zoho_subscription = zohoSubscription(create_user.id, firstName, lastName, email)
+					# 	else:
+					# 		zoho_msg = add_zoho_subscription
+					# except Exception as e:
+					# 	zoho_msg = str(e)
 					
 					try:
 						add_to_mail_list = addToZohoCampaign(firstName, lastName, email)
@@ -1741,9 +1734,36 @@ class CreateSite(APIView):
 		try:
 			custID = request.user.id
 			site_name =  str(request.POST['site_name'])
+			
+			userSubPlan = userSubscriptionPlan.objects.get(cust_id = custID)
+			if userSubPlan.end_date and userSubPlan.end_date.isoformat() < datetime.datetime.now().isoformat():
+				final_response['status'] = status.HTTP_400_BAD_REQUEST	
+				final_response['message'] = 'Unable to create new Site, Plan Expired!'
+				return Response(final_response)
+
+ 			# Populate plan details and check if count is less than the allowed limit, otherwise return error
+			# Fetch plan details and compare with number of sites
+			
+			subscriptionPlan = ssSubscriptionPlans.objects.get(id = userSubPlan.subscription_plan_id)
+			subscriptionPlanDetail = ssSubscriptionPlansDetails.objects.get(ss_subscription_plans_id = subscriptionPlan.id)
+
+			user_all_sites = userSites.objects.filter(cust_id=custID, is_active=1)
+			if len(user_all_sites) >= subscriptionPlanDetail.total_sites == len(user_all_sites):
+				final_response['status'] = status.HTTP_400_BAD_REQUEST	
+				final_response['message'] = 'Maximum Limit Reached! Please upgrade your plan'
+				return Response(final_response)
+
+			
+			is_site_exists = user_all_sites.filter(site_name = site_name)
+
+			# TODO: Site name should be unique globally???
 			# check if site already exists
-			get_sites = userSites.objects.filter(cust_id=custID, site_name=site_name, is_active=1)
-			if len(get_sites) > 0:
+			# for user_site in user_all_sites:
+			# 	if user_site.site_name == site_name:
+
+			# get_sites = userSites.objects.filter(cust_id=custID, site_name=site_name, is_active=1)
+			# TODO: CHeck is_site_exists condition
+			if is_site_exists:
 				final_response['status'] = status.HTTP_400_BAD_REQUEST	
 				final_response['message'] = 'This site already exists.'
 				return Response(final_response)	
