@@ -14,7 +14,7 @@ import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
+LOGIN_URL = "/admin/login/"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
@@ -28,6 +28,9 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 # Application definition
+
+# Overriding the default user model
+AUTH_USER_MODEL = 'siteApp.User'
 
 INSTALLED_APPS = [
     'corsheaders',
@@ -154,7 +157,8 @@ OAUTH2_PROVIDER = {
 }
 
 # TOKEN_URL = 'http://159.65.145.117'
-TOKEN_URL = 'http://143.198.169.204'
+# TOKEN_URL = 'http://143.198.169.204'
+TOKEN_URL = 'http://127.0.0.1:8000'
 
 SENDGRID_API_KEY = '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'
 SENDGRID_FROM_EMAIL = 'taruns@ghrix.com'
